@@ -285,7 +285,7 @@ if __name__ == '__main__':
 
     ang = np.deg2rad(180)
     d = 30
-    noise = 10**(-0.1*25)
+    noise = 10**(-0.1*35)
     psf_data = motion_rectifier(ang, d)
     psf_data /= psf_data.sum()
     psf_data_pad = np.zeros_like(img_bw)
@@ -316,13 +316,12 @@ if __name__ == '__main__':
     res_rgb = np.roll(res_rgb, -kw//2, 1)
 #Normalization process done here 
     res_rgb=cv2.normalize(res_rgb,None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-#res_rgb=cv2.fastNlMeansDenoisingColored(res_rgb,None,2,2,2,2)
-    edges = cv2.Canny(res_rgb,150,200)
+    #res_rgb=cv2.fastNlMeansDenoisingColored(res_rgb,None,2,2,2,2)
     cv2.namedWindow('Output result', cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Output result", 400,300)
     cv2.moveWindow("Output result", 0, 0)
-    cv2.imshow("Output result",edges)
-    cv2.imwrite("test.jpg", edges)
+    cv2.imshow("Output result",res_rgb)
+    cv2.imwrite("test.jpg", res_rgb)
     # Initialize the parameters
     confThreshold = 0.5  #Confidence threshold
     nmsThreshold = 0.4  #Non-maximum suppression threshold

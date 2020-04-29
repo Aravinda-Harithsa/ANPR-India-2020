@@ -31,7 +31,7 @@ import cv2
 '''This function implements Blurring for reduction of noise as a part of preprocessing '''
 ###########################################################################################################################################
 
-def Smoothen_image(img, d=31):
+def Smoothen_image(img, d=20):
     h, w  = img.shape[:2]
     img_pad = cv2.copyMakeBorder(img, d, d, d, d, cv2.BORDER_WRAP)
     img_blur = cv2.GaussianBlur(img_pad, (2*d+1, 2*d+1), -1)[d:-d,d:-d]
@@ -58,6 +58,7 @@ def motion_rectifier(angle, d, sz=120):
 ###########################################################################################################################################
 def cropped(left, top, leftwidth, topheight):
     crop_img = frame[top:topheight, left:leftwidth]
+    
     cv2.imwrite("cropped.jpg",crop_img.astype(np.uint8))
     
 ###########################################################################################################################################
@@ -95,6 +96,7 @@ with predefined threshold'''
 ###########################################################################################################################################
 
 def postprocess(frame, outs):
+    print("YOLO v3 based CNN  pre trained model running for detection of LP\n")
     frameHeight = frame.shape[0]
     frameWidth = frame.shape[1]
 
@@ -189,26 +191,33 @@ end result of sorted countours from left to right'''
 def plate_segmentation(img_file_path):
 
     img = cv2.imread(img_file_path)
-    imgray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    height = img.shape[0]
-    width = img.shape[1]
+    gray1 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    width = int(img.shape[1]*3)
+    height = int(img.shape[0]*3)
+    dim = (width, height)
+    # resize image
+    resized = cv2.resize(gray1, dim, interpolation = cv2.INTER_AREA)
+    gray = cv2.threshold(resized, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    gray = cv2.medianBlur(gray, 3)
+    kernele = np.ones((3,3),np.uint8)
+    kerneld = np.ones((5,5),np.uint8)
+    #opening = cv2.morphologyEx(imgray, cv2.MORPH_OPEN, kernele)
+    erosion = cv2.erode(gray,kernele,iterations = 1)
+    dilation = cv2.dilate(erosion,kerneld,iterations = 1)
+    cv2.imshow("thebestu", dilation)
+    cv2.imwrite("thebestu.jpg", dilation)
+    detectu = cv2.imread("thebestu.jpg")
+    ret3,th3 = cv2.threshold(dilation,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    
+    height = dilation.shape[0]
+    width = dilation.shape[1]
     area = height * width
 
-    scale1 = 0.001
-    scale2 = 0.1
+    scale1 = 0.01
+    scale2 = 0.2
     area_condition1 = area * scale1
-    area_condition2 = area * scale2
-    # global thresholding
-    ret1,th1 = cv2.threshold(imgray,127,255,cv2.THRESH_BINARY)
-
-    # Otsu's thresholding
-    ret2,th2 = cv2.threshold(imgray,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-
-    # Otsu's thresholding after Gaussian filtering
-    blur = cv2.GaussianBlur(imgray,(5,5),0)
-    ret3,th3 = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-
+    area_condition2 = area * scale2  
     contours, hierarchy = cv2.findContours(th3, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     # sort contours
@@ -219,17 +228,18 @@ def plate_segmentation(img_file_path):
         (x,y,w,h) = cv2.boundingRect(cnt)
 
 
-        if (w * h > area_condition1 and w * h < area_condition2 and w/h > 0.3 and h/w > 0.3):
+        if (w * h > area_condition1 and w * h < area_condition2 and w/h > 0.2 and h/w > 0.3):
             x_cntr_list.append(x) 
-            cv2.drawContours(img, [cnt], 0, (0, 255, 0), 3)
-            cv2.rectangle(img, (x,y), (x+w,y+h), (255, 0, 0), 2)
-            c = th2[y:y+h,x:x+w]
+            cv2.drawContours(detectu, [cnt], 0, (0, 255, 0), 3)
+            cv2.rectangle(detectu, (x,y), (x+w,y+h), (255, 0, 0), 2)
+            c = dilation[y:y+h,x:x+w]
             c = np.array(c)
             c = cv2.bitwise_not(c)
             c = square(c)
+            
             c = cv2.resize(c,(28,28), interpolation = cv2.INTER_AREA)
             cropped.append(c)
-    cv2.imwrite('detection.png', img)
+    cv2.imwrite('detection.png', detectu)
     indices = sorted(range(len(x_cntr_list)), key=lambda k: x_cntr_list[k])
     croppedw = []
     for idx in indices:
@@ -243,7 +253,6 @@ def plate_segmentation(img_file_path):
 ###########################################################################################################################################
 #-==----------------===============================================
 if __name__ == '__main__':
-
     image = cv2.imread('input.jpg')
     cv2.namedWindow('Input image', cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Input image", 400,300)
@@ -284,8 +293,8 @@ if __name__ == '__main__':
 #point spread function parameters are set here below    
 
     ang = np.deg2rad(180)
-    d = 30
-    noise = 10**(-0.1*35)
+    d = 7
+    noise = 10**(-0.1*30)
     psf_data = motion_rectifier(ang, d)
     psf_data /= psf_data.sum()
     psf_data_pad = np.zeros_like(img_bw)
@@ -316,12 +325,15 @@ if __name__ == '__main__':
     res_rgb = np.roll(res_rgb, -kw//2, 1)
 #Normalization process done here 
     res_rgb=cv2.normalize(res_rgb,None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
-    #res_rgb=cv2.fastNlMeansDenoisingColored(res_rgb,None,2,2,2,2)
+    res_rgb=cv2.fastNlMeansDenoisingColored(res_rgb,None,2,2,2,2)
     cv2.namedWindow('Output result', cv2.WINDOW_NORMAL)
     cv2.resizeWindow("Output result", 400,300)
     cv2.moveWindow("Output result", 0, 0)
     cv2.imshow("Output result",res_rgb)
     cv2.imwrite("test.jpg", res_rgb)
+
+##########################################################################################################
+    print("------------WELCOME TO INDIAN TRAFFIC SURVAILANCE( INDIAN ANPR 2020-------------------------")
     # Initialize the parameters
     confThreshold = 0.5  #Confidence threshold
     nmsThreshold = 0.4  #Non-maximum suppression threshold
@@ -369,6 +381,7 @@ if __name__ == '__main__':
 
         # Write the frame with the detection boxes
     if ('test.jpg'):
+        print("LP image generated and saved\n")
         cv2.imwrite(outputFile, frame.astype(np.uint8));
     else:
         vid_writer.write(frame.astype(np.uint8))
@@ -376,17 +389,19 @@ if __name__ == '__main__':
 
         
       
-        
-    print("------------WELCOME TO INDIAN TRAFFIC SURVAILANCE-------------------------")
-    print("Deblurring Sucessfully DOne .......")
+    cv2.imshow("outputFile", frame.astype(np.uint8))
+    print("Deblurring Sucessfully DOne .......\n")
     print("----------------------------------------------------------------")
-    print("YOLO pre trained model runnin for detection of LP")
-    print("LP image generated and saved ")
+    
+    
     print("----------------------------------------------------------------")
     print("Recognition OCR running ....")
     print("----------------------------------------------------------------")
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'   
 
-
+   
+    
+    
     # Load model
     model = load_model('cnn_classifier.h5')
     total=0
@@ -397,6 +412,7 @@ if __name__ == '__main__':
     #cv2.resizeWindow("Number plate cropped", 250,100)
     #cv2.moveWindow("Number plate cropped", 0, 300)
     #cv2.imshow("Number plate cropped",crp)
+    
     digits = plate_segmentation('cropped.jpg')
     result =[]
     # Predict
@@ -423,31 +439,52 @@ if __name__ == '__main__':
         ohe = OneHotEncoder(handle_unknown='ignore', categorical_features=None)
         ohe.fit(classes)
         pred = ohe.inverse_transform(prediction)
+        print('Prediction : ' + str(pred[0][0]) + ' , Precision : ' + str(precision))
 
-        if precision > 0.8:
-            print('Prediction : ' + str(pred[0][0]) + ' , Precision : ' + str(precision))
+        if precision > 0.5:
+            #print('Prediction : ' + str(pred[0][0]) + ' , Precision : ' + str(precision))
             result.append(str(pred[0][0]))
             total = total+precision
             count=count+1
-
+    img = cv2.imread("thebestu.jpg")
+    gray1 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    image = cv2.imread("cropped.jpg")
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.threshold(gray, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+    width = int(img.shape[1]*1)
+    height = int(img.shape[0]*1)
+    dim = (width, height)
+    # resize image
+    resized = cv2.resize(gray1, dim, interpolation = cv2.INTER_AREA)
+    gray = cv2.threshold(resized, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
     gray = cv2.medianBlur(gray, 3)
-    cv2.imwrite("ty.jpg", gray)
-    text = pytesseract.image_to_string(cv2.imread("ty.jpg"))
-    print("\nvehicle number by tesseract")
+    kernele = np.ones((3,3),np.uint8)
+    kerneld = np.ones((5,5),np.uint8)
+    #opening = cv2.morphologyEx(imgray, cv2.MORPH_OPEN, kernele)
+    erosion = cv2.erode(gray,kernele,iterations = 1)
+    dilation = cv2.dilate(erosion,kerneld,iterations = 1)
+    cv2.imwrite("thebestu.jpg", dilation)
+    cv2.imshow("Image Enhancement ", dilation)    
+    cv2.imshow("ROI detection ", cv2.imread("yolo_out_py.jpg"))
+    
+    cv2.imshow("Image segmentation",cv2.imread("detection.png"))
+    
+    print("###################################################################################### ")            
+    print("\nvehicle number by CNN model 1 ( Tesseract ocr) ")
+    text = pytesseract.image_to_string(cv2.imread("thebestu.jpg"))
     print(text)
+
+
+           
+
+   
+    
 #-=============OCR BY SELF TRAINED MODEL==================================================================== ---------------------
     str1 = ""      
     for ele in result:
-        str1 += ele  
-    print("\nThe vehicle number by CNN trained OCR  is  : ")
+        str1 += ele
+    print("###################################################################################### ") 
+    print("\nThe vehicle number by CNN model 2 Tensorflow -MNIST dataset : ")
     print(str1)
-
+    print("###################################################################################### ") 
     accuracy=(total/count)*100
     print("\nThe Precision of detection is : ",int(accuracy),"percent")
 
@@ -465,25 +502,26 @@ if __name__ == '__main__':
                     
 #==========================ocr By tesseract================================================================
     rto1=""
-    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    image = cv2.imread("cropped.jpg")
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.threshold(gray, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    gray = cv2.medianBlur(gray, 3)
-    cv2.imwrite("ty.jpg", gray)
-    text = pytesseract.image_to_string(cv2.imread("ty.jpg"))
-    for element in range(0,4): 
+    print(text)
+    text.replace(" ", "")
+    print(text)
+    for element in range(0,6):
+        if(text[element]==" "):
+            continue 
         rto1+=text[element]
+        if(element==4):
+            break
     with open(filename, 'r') as csvfile: 
         
         csvreader = csv.reader(csvfile) 
         fields = next(csvreader) 
         for row in csvreader:
             if row[1]== rto1:
+                print("###################################################################################### ") 
                 print(" The vehicle details are :- \n")
                 print(row[1],row[2],row[3])
                 print ( "visit vahan.nic.in for more details")
-                    
+                print("###################################################################################### ")     
 
 #---------------------------------------------------------------------------
 

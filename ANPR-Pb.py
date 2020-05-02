@@ -279,7 +279,7 @@ if __name__ == '__main__':
     # Process inputs
     
     outputFile = "yolo_out_py.avi"
-    frame = cv2.imread("test.jpeg")
+    frame = cv2.imread("test.jpg")
     outputFile = 'yolo_out_py.jpg'
        
         # Create a 4D blob from a frame.
@@ -369,20 +369,7 @@ if __name__ == '__main__':
     img = cv2.imread("thebestu.jpg")
     gray1 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
-    width = int(img.shape[1]*1)
-    height = int(img.shape[0]*1)
-    dim = (width, height)
-    # resize image
-    resized = cv2.resize(gray1, dim, interpolation = cv2.INTER_AREA)
-    gray = cv2.threshold(resized, 0, 255,cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
-    gray = cv2.medianBlur(gray, 3)
-    kernele = np.ones((3,3),np.uint8)
-    kerneld = np.ones((5,5),np.uint8)
-    #opening = cv2.morphologyEx(imgray, cv2.MORPH_OPEN, kernele)
-    erosion = cv2.erode(gray,kernele,iterations = 1)
-    dilation = cv2.dilate(erosion,kerneld,iterations = 1)
-    cv2.imwrite("thebestu.jpg", dilation)
-    cv2.imshow("Image Enhancement ", dilation)    
+  
     cv2.imshow("ROI detection ", cv2.imread("yolo_out_py.jpg"))
     
     cv2.imshow("Image segmentation",cv2.imread("detection.png"))

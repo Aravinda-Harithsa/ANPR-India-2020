@@ -41,6 +41,8 @@ Important Features of this project
 6.Tesseract OCR  Engine is also trained for double verification of the data.
 
 7.Then the Given Registration Number is read from RTO database to give the details about location of the vehicle.
-
+ 
+ ![Input image](https://github.com/Aravinda-Harithsa/ANPR-India-2020/blob/master/Final.JPG)
+ 
 * Future scope is to fetch the details of the owner avaialable at vahan.nic.in
 
